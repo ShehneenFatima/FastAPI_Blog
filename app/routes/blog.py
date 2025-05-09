@@ -1,11 +1,16 @@
+
+
+# app/routes/blog.py
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
-from app.auth.auth_bearer import JWTBearer
+from fastapi_csrf_protect import CsrfProtect
 
 from app.db.database import SessionLocal
 from app.models.blog import Blog
 from app.schemas.blog import BlogCreate, BlogOut
+from app.auth.auth_bearer import JWTBearer
 
 router = APIRouter(prefix="/blogs", tags=["blogs"])
 
@@ -16,9 +21,15 @@ def get_db():
     finally:
         db.close()
 
-@router.post("/", response_model=BlogOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/",
+    response_model=BlogOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(JWTBearer()), Depends(CsrfProtect())],
+)
 def create_blog(blog_in: BlogCreate, db: Session = Depends(get_db)):
-    new_blog = Blog(title=blog_in.title, content=blog_in.content, owner_id=1)  # TODO: real user
+    # TODO: Replace owner_id=1 with the actual user ID extracted from JWTBearer
+    new_blog = Blog(title=blog_in.title, content=blog_in.content, owner_id=1)
     db.add(new_blog)
     db.commit()
     db.refresh(new_blog)
@@ -34,17 +45,3 @@ def get_blog(blog_id: int, db: Session = Depends(get_db)):
     if not blog:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blog not found")
     return blog
-
-
-
-
-
-
-# …
-@router.post("/", response_model=BlogOut, status_code=status.HTTP_201_CREATED, dependencies=[Depends(JWTBearer())])
-def create_blog(blog_in: BlogCreate, db: Session = Depends(get_db)):
-    # now you know request.user (the subject) is valid
-    user_id = int(Depends(JWTBearer()))  # or extract inside the function
-    new_blog = Blog(title=blog_in.title, content=blog_in.content, owner_id=user_id)
-    # …
-
